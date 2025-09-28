@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readJson, writeJson } from '@/lib/storage';
+import { sendDiscordLog, createDonationEmbed, createSystemEmbed } from '@/lib/discord';
 
 export const runtime = 'nodejs';
 
@@ -176,6 +177,27 @@ export async function POST(req: NextRequest) {
   // Keep only last 500
   while (donations.length > 500) donations.shift();
   await writeJson('donations.json', donations);
+
+  // 📢 DISCORD LOGGING
+  try {
+    const embed = createDonationEmbed({
+      donor: donation.donor,
+      amount: donation.amount,
+      message: donation.message,
+      matchedUsername: donation.matchedUsername,
+    });
+
+    await sendDiscordLog({
+      embeds: [embed],
+      username: 'BagiBagi Bot',
+      avatar_url: 'https://cdn.discordapp.com/attachments/1234567890/bagibagi-icon.png', // Optional: BagiBagi logo
+    });
+
+    console.log('✅ Discord notification sent for donation:', donation.id);
+  } catch (error) {
+    console.error('❌ Failed to send Discord notification:', error);
+    // Don't fail the webhook if Discord fails
+  }
 
   return NextResponse.json({ ok: true, donation });
 }

@@ -33,7 +33,6 @@ Data is stored on disk under `data/` as JSON files: `usernameMap.json` and `dona
 1. Player opens `http://<your-host>/register`, inputs Roblox username, and gets a code like `#ABCD12`.
 2. Player includes that code in the BagiBagi donation message: e.g., `#ABCD12 semangat!`.
 3. When the webhook is delivered, the backend matches the donation and records it with `matchedUsername`.
-4. Your Roblox game polls `GET /api/roblox/donations?username=<RobloxName>` to display donations.
 
 ---
 
@@ -43,11 +42,11 @@ Berdasarkan dashboard BagiBagi Anda, ikuti langkah berikut:
 
 1. **Deploy aplikasi ini** ke Vercel/Netlify terlebih dahulu
 2. **Di BagiBagi dashboard** (bagian Integration):
-   - **Custom URL**: Masukkan `https://<your-deployed-url>/api/webhooks/bagibagi`
+   - **Custom URL**: Masukan `https://<your-deployed-url>/api/webhooks/bagibagi`
    - **Webhook Token**: Sudah ada `QFWmRRYMoRPQEGhvrdSgeKo1dCVYXF` (gunakan ini)
 
 3. **Set environment variable** di hosting Anda:
-   ```
+{{ ... }}
    WEBHOOK_TOKEN=QFWmRRYMoRPQEGhvrdSgeKo1dCVYXF
    ```
 
@@ -57,7 +56,35 @@ Berdasarkan dashboard BagiBagi Anda, ikuti langkah berikut:
 
 ---
 
-## 4) Endpoints
+## 4) Discord Logging Setup (Optional)
+
+Untuk monitoring donasi real-time di Discord:
+
+1. **Buat Discord Webhook**:
+   - Buka Discord server → Server Settings → Integrations → Webhooks
+   - Klik "New Webhook" → Pilih channel untuk notifikasi
+   - Copy webhook URL
+
+2. **Set Environment Variable**:
+   ```bash
+   DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN
+   ```
+
+3. **Test Discord Integration**:
+   ```bash
+   curl https://your-app.vercel.app/api/discord/log
+   ```
+
+### Discord Features:
+- 🎉 **Real-time donation notifications** dengan embed yang cantik
+- 📊 **Statistik donasi** (hourly, daily, weekly, monthly)
+- 🎯 **Match rate tracking** untuk monitoring efektivitas
+- 🏆 **Top donors & recipients** leaderboard
+- ⚠️ **System alerts** untuk monitoring uptime
+
+---
+
+## 5) Endpoints
 
 - `POST /api/webhooks/bagibagi`
   - Body: JSON from BagiBagi.
@@ -67,6 +94,22 @@ Berdasarkan dashboard BagiBagi Anda, ikuti langkah berikut:
 - `POST /api/register`
   - Body JSON: `{ "username": "RobloxName" }`
   - Returns: `{ ok: true, code, username }`
+
+- `GET /api/roblox/donations?username=<name>`
+  - Returns donations for specific Roblox player
+  - Used by Roblox server to poll for new donations
+
+- `GET /api/discord/log`
+  - Test Discord webhook integration
+  - Sends test message to Discord
+
+- `POST /api/discord/log`
+  - Manual Discord logging
+  - Body: `{ "type": "info|success|warning|error", "title": "Title", "description": "Description" }`
+
+- `GET /api/discord/stats?period=1h|24h|7d|30d`
+  - Send donation statistics to Discord
+  - Default period: 24h
 
 - `GET /api/roblox/donations?username=<name>&since=<ms>&limit=<n>`
   - Returns newest first: `{ ok: true, donations: [...] }`
