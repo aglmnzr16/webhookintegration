@@ -1,34 +1,28 @@
-import { promises as fs } from 'fs';
-import path from 'path';
+// Simple in-memory storage for Vercel serverless
+// In production, consider using Vercel KV, Supabase, or other database
 
-const dataDir = path.join(process.cwd(), 'data');
-
-async function ensureDataDir() {
-  try {
-    await fs.mkdir(dataDir, { recursive: true });
-  } catch {}
-}
+const memoryStore = new Map<string, any>();
 
 export async function readJson<T>(fileName: string, fallback: T): Promise<T> {
-  await ensureDataDir();
-  const filePath = path.join(dataDir, fileName);
   try {
-    const raw = await fs.readFile(filePath, 'utf8');
-    return JSON.parse(raw) as T;
-  } catch (e: any) {
-    if (e?.code === 'ENOENT') return fallback;
-    throw e;
+    const data = memoryStore.get(fileName);
+    return data !== undefined ? data : fallback;
+  } catch (e) {
+    console.warn('Error reading from memory store:', e);
+    return fallback;
   }
 }
 
 export async function writeJson<T>(fileName: string, data: T): Promise<void> {
-  await ensureDataDir();
-  const filePath = path.join(dataDir, fileName);
-  const tmpPath = filePath + '.tmp';
-  await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-  await fs.rename(tmpPath, filePath);
+  try {
+    memoryStore.set(fileName, data);
+    console.log(`✅ Stored ${fileName} in memory`);
+  } catch (e) {
+    console.error('Error writing to memory store:', e);
+    throw e;
+  }
 }
 
 export function getDataPath(fileName: string) {
-  return path.join(dataDir, fileName);
+  return `memory://${fileName}`;
 }

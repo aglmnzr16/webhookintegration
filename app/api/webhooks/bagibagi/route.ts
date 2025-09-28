@@ -54,6 +54,8 @@ function extractCodeFromMessage(msg?: string): string | undefined {
 }
 
 export async function POST(req: NextRequest) {
+  console.log('🔔 Webhook received from BagiBagi');
+  
   // Read body as JSON (BagiBagi should POST JSON). If not JSON, try text->JSON parse.
   let body: any;
   const contentType = req.headers.get('content-type') || '';
@@ -64,18 +66,22 @@ export async function POST(req: NextRequest) {
       const text = await req.text();
       try { body = JSON.parse(text); } catch { body = { raw: text }; }
     }
+    console.log('📦 Webhook body:', JSON.stringify(body, null, 2));
   } catch (e) {
+    console.error('❌ Failed to parse webhook body:', e);
     return NextResponse.json({ ok: false, error: 'Failed to parse body' }, { status: 400 });
   }
 
-  // Verify BagiBagi webhook token
+  // Verify BagiBagi webhook token (optional for now)
   const expected = process.env.WEBHOOK_TOKEN;
   const got = req.headers.get('x-webhook-token') || 
              req.headers.get('authorization')?.replace('Bearer ', '') ||
              body?.token; // BagiBagi might send token in body
   
-  if (got !== expected) {
-    console.log('Webhook auth failed. Expected:', expected, 'Got:', got);
+  console.log('🔐 Token check - Expected:', expected, 'Got:', got);
+  
+  if (expected && got !== expected) {
+    console.log('❌ Webhook auth failed');
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 
