@@ -133,16 +133,41 @@ export async function POST(req: NextRequest) {
     const registrations = await readJson<Record<string, string>>('registrations.json', {});
     console.log('📋 Available registrations:', Object.keys(registrations));
     
+    // Try username match first
     for (const username of Object.keys(registrations)) {
       const normalizedUsername = username.toLowerCase().replace(/\s+/g, '');
       
-      // Exact match atau partial match
+      // Exact match atau partial match dengan username
       if (normalizedUsername === normalizedDonorName || 
           normalizedUsername.includes(normalizedDonorName) ||
           normalizedDonorName.includes(normalizedUsername)) {
         matchedUsername = username;
-        console.log('✅ Direct name matched:', donor, '→', username);
+        console.log('✅ Direct username matched:', donor, '→', username);
         break;
+      }
+    }
+    
+    // METODE 2.5: Display name matching
+    // If no username match, check if donor name matches a registered display name
+    if (!matchedUsername || matchedUsername === '') {
+      console.log('🔍 Attempting display name matching for donor:', donor);
+      
+      // Load display name mappings (username -> displayName)
+      const displayNames = await readJson<Record<string, string>>('displaynames.json', {});
+      console.log('📋 Available display names:', Object.keys(displayNames).length);
+      
+      // Match donor name against display names
+      for (const [username, displayName] of Object.entries(displayNames)) {
+        const normalizedDisplayName = displayName.toLowerCase().replace(/\s+/g, '');
+        
+        // Check for exact or partial match with display name
+        if (normalizedDisplayName === normalizedDonorName || 
+            normalizedDisplayName.includes(normalizedDonorName) ||
+            normalizedDonorName.includes(normalizedDisplayName)) {
+          matchedUsername = username;
+          console.log('✅ Display name matched:', donor, '→', displayName, '(username:', username + ')');
+          break;
+        }
       }
     }
     
