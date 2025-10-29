@@ -178,6 +178,10 @@ export async function POST(req: NextRequest) {
   while (donations.length > 500) donations.shift();
   await writeJson('donations.json', donations);
 
+  console.log('💾 Donation saved to donations.json');
+  console.log('📊 Total donations in file:', donations.length);
+  console.log('🔍 Donations with matchedUsername:', donations.filter(d => d.matchedUsername).length);
+
   // 📢 DISCORD LOGGING
   try {
     const embed = createDonationEmbed({
