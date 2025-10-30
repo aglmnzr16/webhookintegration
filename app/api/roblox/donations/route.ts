@@ -3,12 +3,13 @@ import { prisma } from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 
-// GET /api/roblox/donations?username=<robloxName>&since=<timestamp>
-// Returns recent donations, optionally filtered by robloxUsername if provided.
-// Now using Prisma database
+// GET /api/roblox/donations?source=<bagibagi|saweria>&username=<robloxName>&since=<timestamp>
+// Returns recent donations from specified platform
+// Supports dual platform: BagiBagi and Saweria
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
+  const source = (searchParams.get('source') || 'bagibagi').toLowerCase();
   const username = (searchParams.get('username') || '').trim();
   const sinceParam = searchParams.get('since') || '';
   const limit = Math.min(50, Math.max(1, Number(searchParams.get('limit') || 25)));
@@ -33,24 +34,45 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Query donations from database
-    const dbDonations = await prisma.donation.findMany({
-      where,
-      select: {
-        id: true,
-        donationId: true,
-        donorName: true,
-        robloxUsername: true,
-        amount: true,
-        message: true,
-        source: true,
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: limit,
-    });
+    // Query from appropriate table based on source
+    let dbDonations;
+    
+    if (source === 'saweria') {
+      dbDonations = await prisma.saweriaDonation.findMany({
+        where,
+        select: {
+          id: true,
+          donationId: true,
+          donorName: true,
+          robloxUsername: true,
+          amount: true,
+          message: true,
+          createdAt: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: limit,
+      });
+    } else {
+      // Default to BagiBagi
+      dbDonations = await prisma.bagiBagiDonation.findMany({
+        where,
+        select: {
+          id: true,
+          donationId: true,
+          donorName: true,
+          robloxUsername: true,
+          amount: true,
+          message: true,
+          createdAt: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: limit,
+      });
+    }
 
     // Format to match original response format
     const donations = dbDonations.map(d => ({
@@ -60,12 +82,12 @@ export async function GET(req: NextRequest) {
       amount: d.amount,
       message: d.message,
       matchedUsername: d.robloxUsername,
-      source: d.source,
+      source: source, // Include source in response
     }));
 
-    return NextResponse.json({ ok: true, donations });
+    return NextResponse.json({ ok: true, donations, source });
   } catch (error) {
-    console.error('❌ Database error fetching donations:', error);
+    console.error(`❌ Database error fetching ${source} donations:`, error);
     return NextResponse.json(
       { ok: false, error: 'Database error' },
       { status: 500 }
