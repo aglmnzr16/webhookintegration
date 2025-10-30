@@ -100,12 +100,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Extract donation data from webhook body
-  const donor = body.donor || body.name || 'Anonymous';
-  const amount = body.amount || 0;
+  // Extract donation data from webhook body (Saweria structure)
+  // Saweria uses: donator_name, amount_raw, message, etc.amount_to_display
+  const donor = body.donator_name || body.donor || body.name || 'Anonymous';
+  const amount = body.etc?.amount_to_display || body.amount_raw || body.amount || 0;
   const message = body.message || '';
+  const donatorEmail = body.donator_email || '';
+  const saweriaId = body.id || '';
 
-  console.log('💰 Processing donation:', { donor, amount, message });
+  console.log('💰 Processing Saweria donation:', { 
+    donor, 
+    amount, 
+    message,
+    email: donatorEmail,
+    saweriaId,
+    rawAmount: body.amount_raw,
+    displayAmount: body.etc?.amount_to_display 
+  });
 
   // METODE 1: Extract username from message using code pattern (backward compatibility)
   let matchedUsername = null;

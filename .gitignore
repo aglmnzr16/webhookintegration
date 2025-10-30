@@ -19,7 +19,7 @@
 
 # production
 /build
-# /roblox
+/roblox
 # misc
 .DS_Store
 *.pem
