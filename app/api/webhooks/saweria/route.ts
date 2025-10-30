@@ -56,9 +56,9 @@ function extractCodeFromMessage(msg?: string): string | undefined {
 }
 
 export async function POST(req: NextRequest) {
-  console.log('🔔 Webhook received from BagiBagi');
+  console.log('🔔 Webhook received from Saweria');
   
-  // Read body as JSON (BagiBagi should POST JSON). If not JSON, try text->JSON parse.
+  // Read body as JSON (Saweria should POST JSON). If not JSON, try text->JSON parse.
   let body: any;
   const contentType = req.headers.get('content-type') || '';
   try {
@@ -74,18 +74,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Failed to parse body' }, { status: 400 });
   }
 
-  // Verify BagiBagi webhook token (disabled for testing)
-  const expected = process.env.WEBHOOK_TOKEN;
-  const got = req.headers.get('x-webhook-token') || 
-             req.headers.get('authorization')?.replace('Bearer ', '') ||
-             body?.token; // BagiBagi might send token in body
-  console.log('🔐 Token check - Expected:', expected, 'Got:', got);
+  // Saweria webhook verification (OPTIONAL - Saweria tidak kirim token di header)
+  // Saweria hanya kirim POST request dengan JSON body
+  // Untuk security, bisa validate source IP atau webhook signature (jika ada)
   
-  // Temporarily disabled for testing
-  // if (expected && got !== expected) {
-  //   console.log('❌ Webhook auth failed');
-  //   return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
-  // }
+  // Optional: Check if request from Saweria IP (if known)
+  const forwardedFor = req.headers.get('x-forwarded-for');
+  const realIp = req.headers.get('x-real-ip');
+  console.log('🌐 Request from IP:', realIp || forwardedFor || 'unknown');
+  
+  // Optional: Token validation (if Saweria adds support later)
+  const expectedToken = process.env.SAWERIA_WEBHOOK_TOKEN;
+  const gotToken = req.headers.get('x-webhook-token') || body?.token;
+  
+  if (expectedToken && gotToken && gotToken !== expectedToken) {
+    console.log('❌ Saweria webhook token mismatch');
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  }
 
   // Extract donation data from webhook body
   const donor = body.donor || body.name || 'Anonymous';
@@ -123,7 +128,7 @@ export async function POST(req: NextRequest) {
 
   console.log('🔍 Before direct matching - matchedUsername:', matchedUsername, 'donor:', donor);
 
-  // METODE 2: Direct name matching dari field "Nama" BagiBagi
+  // METODE 2: Direct name matching dari field "Nama" Saweria
   if ((!matchedUsername || matchedUsername === '') && donor) {
     console.log('🔍 Attempting direct name matching for donor:', donor);
     
@@ -198,20 +203,21 @@ export async function POST(req: NextRequest) {
 
   console.log('📋 Final donation object:', JSON.stringify(donation, null, 2));
 
-  const donations = await readJson<DonationsFile>('donations.json', []);
+  // Save to separate Saweria donations file
+  const donations = await readJson<DonationsFile>('saweria-donations.json', []);
   donations.push(donation);
   // Keep only last 500
   while (donations.length > 500) donations.shift();
-  await writeJson('donations.json', donations);
+  await writeJson('saweria-donations.json', donations);
 
-  console.log('💾 Donation saved to donations.json');
+  console.log('💾 Donation saved to saweria-donations.json');
   console.log('📊 Total donations in file:', donations.length);
   console.log('🔍 Donations with matchedUsername:', donations.filter(d => d.matchedUsername).length);
 
-  // 💾 SAVE TO DATABASE with atomic increment for BagiBagiTopSpender
+  // 💾 SAVE TO DATABASE with atomic increment for SaweriaTopSpender
   try {
-    // Save donation to BagiBagi database table
-    await prisma.bagiBagiDonation.create({
+    // Save donation to Saweria database table
+    await prisma.saweriaDonation.create({
       data: {
         donationId: donation.id,
         donorName: donation.donor,
@@ -222,11 +228,11 @@ export async function POST(req: NextRequest) {
         createdAt: new Date(donation.ts),
       },
     });
-    console.log('✅ BagiBagi donation saved to database:', donation.id);
+    console.log('✅ Saweria donation saved to database:', donation.id);
 
-    // Update or create BagiBagiTopSpender with atomic increment
+    // Update or create SaweriaTopSpender with atomic increment
     if (donation.matchedUsername) {
-      await prisma.bagiBagiTopSpender.upsert({
+      await prisma.saweriaTopSpender.upsert({
         where: { robloxUsername: donation.matchedUsername },
         update: {
           totalAmount: {
@@ -244,7 +250,7 @@ export async function POST(req: NextRequest) {
           lastDonation: new Date(donation.ts),
         },
       });
-      console.log('✅ BagiBagiTopSpender updated for:', donation.matchedUsername);
+      console.log('✅ SaweriaTopSpender updated for:', donation.matchedUsername);
     }
   } catch (dbError) {
     console.error('❌ Database error:', dbError);
@@ -262,8 +268,8 @@ export async function POST(req: NextRequest) {
 
     await sendDiscordLog({
       embeds: [embed],
-      username: 'BagiBagi Bot',
-      avatar_url: 'https://cdn.discordapp.com/attachments/1234567890/bagibagi-icon.png', // Optional: BagiBagi logo
+      username: 'Saweria Bot',
+      avatar_url: 'https://cdn.discordapp.com/attachments/1234567890/saweria-icon.png', // Optional: Saweria logo
     });
 
     console.log('✅ Discord notification sent for donation:', donation.id);

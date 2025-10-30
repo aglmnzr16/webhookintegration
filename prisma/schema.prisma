@@ -15,34 +15,32 @@ datasource db {
 }
 
 // ================================================================
-// DONATION MODELS - For Saweria/BagiBagi Integration
+// BAGIBAGI DONATION MODELS
 // ================================================================
 
-// Individual donation transactions (log setiap donation)
-model Donation {
+// BagiBagi individual donation transactions
+model BagiBagiDonation {
   id             Int       @id @default(autoincrement())
-  donationId     String    @unique @db.VarChar(255)  // External ID from webhook
+  donationId     String    @unique @db.VarChar(255)  // External ID from BagiBagi webhook
   donorName      String    @db.VarChar(255)
   robloxUsername String?   @db.VarChar(255)
-  amount         Float     // Amount in Rupiah (using Float for decimal support)
+  amount         Float     // Amount in Rupiah
   message        String?   @db.Text
-  source         String    @default("saweria") @db.VarChar(50)
   rawData        Json?     // Store raw webhook payload
   createdAt      DateTime  @default(now()) @db.Timestamptz()
   
   // Indexes for fast queries
   @@index([robloxUsername])
   @@index([createdAt(sort: Desc)])
-  @@index([source])
   @@index([donationId])
-  @@map("donations")
+  @@map("bagibagi_donations")
 }
 
-// Aggregated top spenders (untuk top board, fast lookup!)
-model TopSpender {
+// BagiBagi aggregated top spenders
+model BagiBagiTopSpender {
   id             Int       @id @default(autoincrement())
   robloxUsername String    @unique @db.VarChar(255)
-  totalAmount    Float     @default(0)     // ✅ SUM of all donations (Float for decimals)
+  totalAmount    Float     @default(0)     // SUM of all BagiBagi donations
   donationCount  Int       @default(0)     // Number of donations
   lastDonation   DateTime  @db.Timestamptz()
   createdAt      DateTime  @default(now()) @db.Timestamptz()
@@ -50,7 +48,44 @@ model TopSpender {
   
   // Index for sorting by total amount (DESC)
   @@index([totalAmount(sort: Desc)])
-  @@map("top_spenders")
+  @@map("bagibagi_top_spenders")
+}
+
+// ================================================================
+// SAWERIA DONATION MODELS
+// ================================================================
+
+// Saweria individual donation transactions
+model SaweriaDonation {
+  id             Int       @id @default(autoincrement())
+  donationId     String    @unique @db.VarChar(255)  // External ID from Saweria webhook
+  donorName      String    @db.VarChar(255)
+  robloxUsername String?   @db.VarChar(255)
+  amount         Float     // Amount in Rupiah
+  message        String?   @db.Text
+  rawData        Json?     // Store raw webhook payload
+  createdAt      DateTime  @default(now()) @db.Timestamptz()
+  
+  // Indexes for fast queries
+  @@index([robloxUsername])
+  @@index([createdAt(sort: Desc)])
+  @@index([donationId])
+  @@map("saweria_donations")
+}
+
+// Saweria aggregated top spenders
+model SaweriaTopSpender {
+  id             Int       @id @default(autoincrement())
+  robloxUsername String    @unique @db.VarChar(255)
+  totalAmount    Float     @default(0)     // SUM of all Saweria donations
+  donationCount  Int       @default(0)     // Number of donations
+  lastDonation   DateTime  @db.Timestamptz()
+  createdAt      DateTime  @default(now()) @db.Timestamptz()
+  updatedAt      DateTime  @updatedAt @db.Timestamptz()
+  
+  // Index for sorting by total amount (DESC)
+  @@index([totalAmount(sort: Desc)])
+  @@map("saweria_top_spenders")
 }
 
 // Optional: Webhook logs for debugging
