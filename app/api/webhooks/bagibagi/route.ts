@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readJson, writeJson } from '@/lib/storage';
 import { sendDiscordLog, createDonationEmbed, createSystemEmbed } from '@/lib/discord';
+import { prisma } from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 
@@ -206,6 +207,50 @@ export async function POST(req: NextRequest) {
   console.log('💾 Donation saved to donations.json');
   console.log('📊 Total donations in file:', donations.length);
   console.log('🔍 Donations with matchedUsername:', donations.filter(d => d.matchedUsername).length);
+
+  // 💾 SAVE TO DATABASE with atomic increment for TopSpender
+  try {
+    // Save donation to database
+    await prisma.donation.create({
+      data: {
+        donationId: donation.id,
+        donorName: donation.donor,
+        robloxUsername: donation.matchedUsername,
+        amount: donation.amount,
+        message: donation.message,
+        source: 'bagibagi',
+        rawData: donation.raw,
+        createdAt: new Date(donation.ts),
+      },
+    });
+    console.log('✅ Donation saved to database:', donation.id);
+
+    // Update or create TopSpender with atomic increment
+    if (donation.matchedUsername) {
+      await prisma.topSpender.upsert({
+        where: { robloxUsername: donation.matchedUsername },
+        update: {
+          totalAmount: {
+            increment: donation.amount,
+          },
+          donationCount: {
+            increment: 1,
+          },
+          lastDonation: new Date(donation.ts),
+        },
+        create: {
+          robloxUsername: donation.matchedUsername,
+          totalAmount: donation.amount,
+          donationCount: 1,
+          lastDonation: new Date(donation.ts),
+        },
+      });
+      console.log('✅ TopSpender updated for:', donation.matchedUsername);
+    }
+  } catch (dbError) {
+    console.error('❌ Database error:', dbError);
+    // Don't fail the webhook if database fails - JSON backup still works
+  }
 
   // 📢 DISCORD LOGGING
   try {

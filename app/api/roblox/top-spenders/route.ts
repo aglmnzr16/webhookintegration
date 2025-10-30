@@ -1,40 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readJson } from '@/lib/storage';
-import type { Donation } from '@/app/api/webhooks/bagibagi/route';
+import { prisma } from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 
 // GET /api/roblox/top-spenders?limit=10
-// Returns top spenders aggregated by matchedUsername
+// Returns top spenders aggregated by robloxUsername
+// Now using Prisma database with pre-aggregated TopSpender table
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const limit = Math.min(50, Math.max(1, Number(searchParams.get('limit') || 10)));
 
-  const donations = await readJson<Donation[]>('donations.json', []);
+  try {
+    // Query pre-aggregated TopSpender table (FAST!)
+    const topSpenders = await prisma.topSpender.findMany({
+      select: {
+        robloxUsername: true,
+        totalAmount: true,
+        donationCount: true,
+        lastDonation: true,
+      },
+      orderBy: {
+        totalAmount: 'desc',
+      },
+      take: limit,
+    });
 
-  // Aggregate donations by matchedUsername
-  const spenderMap = new Map<string, number>();
+    // Format response to match expected format
+    const formattedSpenders = topSpenders.map(spender => ({
+      username: spender.robloxUsername,
+      totalAmount: spender.totalAmount,
+      donationCount: spender.donationCount,
+      lastDonation: spender.lastDonation.toISOString(),
+    }));
 
-  for (const donation of donations) {
-    if (donation.matchedUsername) {
-      const currentTotal = spenderMap.get(donation.matchedUsername) || 0;
-      spenderMap.set(donation.matchedUsername, currentTotal + donation.amount);
-    }
+    return NextResponse.json({ 
+      ok: true, 
+      topSpenders: formattedSpenders,
+      count: formattedSpenders.length 
+    });
+  } catch (error) {
+    console.error('❌ Database error fetching top spenders:', error);
+    return NextResponse.json(
+      { ok: false, error: 'Database error' },
+      { status: 500 }
+    );
   }
-
-  // Convert to array and sort by total amount
-  const topSpenders = Array.from(spenderMap.entries())
-    .map(([username, totalAmount]) => ({
-      username,
-      totalAmount
-    }))
-    .sort((a, b) => b.totalAmount - a.totalAmount)
-    .slice(0, limit);
-
-  return NextResponse.json({ 
-    ok: true, 
-    topSpenders,
-    count: topSpenders.length 
-  });
 }

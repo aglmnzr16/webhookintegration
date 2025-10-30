@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ================================================================
+// DONATION MODELS - For Saweria/BagiBagi Integration
+// ================================================================
+
+// Individual donation transactions (log setiap donation)
+model Donation {
+  id             Int       @id @default(autoincrement())
+  donationId     String    @unique @db.VarChar(255)  // External ID from webhook
+  donorName      String    @db.VarChar(255)
+  robloxUsername String?   @db.VarChar(255)
+  amount         Float     // Amount in Rupiah (using Float for decimal support)
+  message        String?   @db.Text
+  source         String    @default("saweria") @db.VarChar(50)
+  rawData        Json?     // Store raw webhook payload
+  createdAt      DateTime  @default(now()) @db.Timestamptz()
+  
+  // Indexes for fast queries
+  @@index([robloxUsername])
+  @@index([createdAt(sort: Desc)])
+  @@index([source])
+  @@index([donationId])
+  @@map("donations")
+}
+
+// Aggregated top spenders (untuk top board, fast lookup!)
+model TopSpender {
+  id             Int       @id @default(autoincrement())
+  robloxUsername String    @unique @db.VarChar(255)
+  totalAmount    Float     @default(0)     // ✅ SUM of all donations (Float for decimals)
+  donationCount  Int       @default(0)     // Number of donations
+  lastDonation   DateTime  @db.Timestamptz()
+  createdAt      DateTime  @default(now()) @db.Timestamptz()
+  updatedAt      DateTime  @updatedAt @db.Timestamptz()
+  
+  // Index for sorting by total amount (DESC)
+  @@index([totalAmount(sort: Desc)])
+  @@map("top_spenders")
+}
+
+// Optional: Webhook logs for debugging
+model WebhookLog {
+  id        Int       @id @default(autoincrement())
+  payload   String    @db.Text
+  processed Boolean   @default(false)
+  error     String?   @db.Text
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  
+  @@index([processed])
+  @@index([createdAt(sort: Desc)])
+  @@map("webhook_logs")
+}
