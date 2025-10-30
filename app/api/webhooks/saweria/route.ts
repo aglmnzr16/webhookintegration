@@ -60,15 +60,23 @@ export async function POST(req: NextRequest) {
   
   // Read body as JSON (Saweria should POST JSON). If not JSON, try text->JSON parse.
   let body: any;
-  const contentType = req.headers.get('content-type') || '';
   try {
-    if (contentType.includes('application/json')) {
+    if (req.headers.get('content-type')?.includes('application/json')) {
       body = await req.json();
     } else {
       const text = await req.text();
       try { body = JSON.parse(text); } catch { body = { raw: text }; }
     }
-    console.log('📦 Webhook body:', JSON.stringify(body, null, 2));
+    
+    // ========== DEBUG: PRINT RAW SAWERIA DATA ==========
+    console.log('🔍 ========== SAWERIA RAW DATA START ==========');
+    console.log('📦 Full Body:', JSON.stringify(body, null, 2));
+    console.log('📊 Body Keys:', Object.keys(body));
+    console.log('💰 Amount field:', body.amount, '(type:', typeof body.amount, ')');
+    console.log('👤 Donor field:', body.donor, '(type:', typeof body.donor, ')');
+    console.log('👤 Name field:', body.name, '(type:', typeof body.name, ')');
+    console.log('💬 Message field:', body.message);
+    console.log('🔍 ========== SAWERIA RAW DATA END ==========');
   } catch (e) {
     console.error('❌ Failed to parse webhook body:', e);
     return NextResponse.json({ ok: false, error: 'Failed to parse body' }, { status: 400 });
